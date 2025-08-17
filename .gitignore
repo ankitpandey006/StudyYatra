@@ -1,0 +1,19 @@
+# 🔐 Secrets and keys
+.env
+backend/serviceAccountKey.json
+
+# 📦 Node dependencies
+node_modules/
+
+# 🛠️ Build outputs
+dist/
+build/
+
+# 📝 Editor/IDE configs
+.vscode/
+.idea/
+.DS_Store
+
+# 🧾 Logs
+*.log
+npm-debug.log*

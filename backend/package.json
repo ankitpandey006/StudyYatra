@@ -1,0 +1,34 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "StudyNest backend using Node.js, Express, Firebase Admin SDK",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "expire-premium": "node scripts/expirePremiumUsers.js",
+    "start-cron": "node cron.js"
+  },
+  "keywords": [
+    "backend",
+    "express",
+    "firebase",
+    "firestore",
+    "studynest"
+  ],
+  "author": "Ankit Pandey",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.4.0",
+    "node-cron": "^4.1.0",
+    "nodemailer": "^7.0.3",
+    "razorpay": "^2.9.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
