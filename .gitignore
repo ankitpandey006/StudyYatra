@@ -1,5 +1,7 @@
 # 🔐 Secrets and keys
 .env
+.env.local 
+backend/.env
 backend/serviceAccountKey.json
 
 # 📦 Node dependencies

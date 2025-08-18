@@ -1,14 +1,14 @@
+// backend/index.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-import { db } from './config/firebase.js'; // ✅ use db here if needed
-
 const app = express();
 const PORT = process.env.PORT || 5050;
 
+// ✅ Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -32,7 +32,7 @@ app.use('/api/check-admin', checkAdminRoute);
 
 // ✅ Root Endpoint
 app.get('/', (req, res) => {
-  res.send('📚 StudyNest Backend is running 🚀');
+  res.send('📚 StudyYatra Backend is running 🚀');
 });
 
 // ✅ Start Server
