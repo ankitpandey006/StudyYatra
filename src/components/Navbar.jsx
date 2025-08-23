@@ -1,67 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  Home, BookOpen, FileText, ClipboardList, Headphones,
-  LogIn, LogOut, Menu, X, CreditCard,
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext'; // ✅ FIXED PATH
-import { signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase'; // ✅ Firebase path correct
-import { toast } from 'react-toastify';
-import logo from '../assets/logo.jpeg';
-import axios from 'axios';
+  Home,
+  BookOpen,
+  FileText,
+  ClipboardList,
+  Headphones,
+  LogIn,
+  LogOut,
+  Menu,
+  X,
+  CreditCard,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { signOut } from "firebase/auth";
+import { auth } from "../lib/firebase";
+import { toast } from "react-toastify";
+import logo from "../assets/logo.jpeg";
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { currentUser } = useAuth();
+  const { currentUser, userData } = useAuth();
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (currentUser) {
-        try {
-          // ✅ Ensure we call getIdToken only if available
-          const token = currentUser.getIdToken ? await currentUser.getIdToken() : null;
-
-          if (token) {
-            const response = await axios.post(
-              `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5050'}/api/check-admin`,
-              {},
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
-            setIsAdmin(response.data.isAdmin);
-          }
-        } catch (error) {
-          console.error('Error verifying admin:', error);
-          setIsAdmin(false);
-        }
-      } else {
-        setIsAdmin(false);
-      }
-    };
-
-    checkAdmin();
-  }, [currentUser]);
-
+  // ✅ Logout
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      toast.success('✅ Logged out successfully!');
-      navigate('/login');
+      toast.success("✅ Logged out successfully!");
+      navigate("/login");
     } catch (error) {
-      toast.error('❌ Logout failed. Try again.');
+      toast.error("❌ Logout failed. Try again.");
     }
   };
 
   return (
     <nav className="bg-gradient-to-r from-blue-50 via-white to-purple-50 shadow-md backdrop-blur-md">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between flex-wrap">
-        {/* ✅ Logo */}
+        {/* Logo */}
         <Link
           to="/"
           onClick={() => setMenuOpen(false)}
@@ -81,24 +57,44 @@ const Navbar = () => {
           </span>
         </Link>
 
-        {/* ☰ Hamburger (Mobile) */}
-        <button className="sm:hidden text-blue-600" onClick={() => setMenuOpen(!menuOpen)}>
+        {/* Hamburger (Mobile) */}
+        <button
+          className="sm:hidden text-blue-600"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
           {menuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
 
-        {/* Desktop Nav */}
+        {/* Desktop Menu */}
         <div className="hidden sm:flex items-center gap-6">
           <div className="flex gap-4 items-center text-sm font-medium text-slate-700">
-            <Link to="/" className="hover:text-blue-600 flex items-center gap-1"><Home size={18} /> Home</Link>
-            <Link to="/books" className="hover:text-blue-600 flex items-center gap-1"><BookOpen size={18} /> Books</Link>
-            <Link to="/notes" className="hover:text-blue-600 flex items-center gap-1"><FileText size={18} /> Notes</Link>
-            <Link to="/pyq" className="hover:text-blue-600 flex items-center gap-1"><ClipboardList size={18} /> PYQs</Link>
-            <Link to="/mocktest" className="hover:text-blue-600 flex items-center gap-1"><ClipboardList size={18} /> Mock Tests</Link>
-            <Link to="/audiobooks" className="hover:text-blue-600 flex items-center gap-1"><Headphones size={18} /> Audio</Link>
-            <Link to="/subscribe" className="text-purple-700 font-semibold hover:text-purple-900 hover:underline flex items-center gap-1"><CreditCard size={18} /> Subscribe</Link>
+            <Link to="/" className="hover:text-blue-600 flex items-center gap-1">
+              <Home size={18} /> Home
+            </Link>
+            <Link to="/books" className="hover:text-blue-600 flex items-center gap-1">
+              <BookOpen size={18} /> Books
+            </Link>
+            <Link to="/notes" className="hover:text-blue-600 flex items-center gap-1">
+              <FileText size={18} /> Notes
+            </Link>
+            <Link to="/pyq" className="hover:text-blue-600 flex items-center gap-1">
+              <ClipboardList size={18} /> PYQs
+            </Link>
+            <Link to="/mocktest" className="hover:text-blue-600 flex items-center gap-1">
+              <ClipboardList size={18} /> Mock Tests
+            </Link>
+            <Link to="/audiobooks" className="hover:text-blue-600 flex items-center gap-1">
+              <Headphones size={18} /> Audio
+            </Link>
+            <Link
+              to="/subscribe"
+              className="text-purple-700 font-semibold hover:text-purple-900 hover:underline flex items-center gap-1"
+            >
+              <CreditCard size={18} /> Subscribe
+            </Link>
 
-            {/* ✅ Admin Panel */}
-            {isAdmin && (
+            {/* ✅ Admin Panel Link (Firestore से) */}
+            {userData?.isAdmin && (
               <Link
                 to="/admin"
                 className="hover:text-red-600 flex items-center gap-1 font-semibold text-red-500 transition-all duration-200"
@@ -107,6 +103,7 @@ const Navbar = () => {
               </Link>
             )}
 
+            {/* Auth Buttons */}
             {currentUser ? (
               <button
                 onClick={handleLogout}
@@ -125,7 +122,7 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* 📱 Mobile Menu */}
+        {/* Mobile Menu */}
         {menuOpen && (
           <div className="w-full mt-4 sm:hidden space-y-2 bg-white rounded-lg shadow-md p-4 text-slate-700">
             <Link to="/" onClick={() => setMenuOpen(false)} className="block px-2 py-1">🏠 Home</Link>
@@ -136,8 +133,15 @@ const Navbar = () => {
             <Link to="/audiobooks" onClick={() => setMenuOpen(false)} className="block px-2 py-1">🎧 Audio</Link>
             <Link to="/subscribe" onClick={() => setMenuOpen(false)} className="block px-2 py-1 text-purple-700 font-semibold">💳 Subscribe</Link>
 
-            {isAdmin && (
-              <Link to="/admin" onClick={() => setMenuOpen(false)} className="block px-2 py-1 text-red-600 font-semibold">🛠️ Admin Panel</Link>
+            {/* ✅ Admin in Mobile Menu */}
+            {userData?.isAdmin && (
+              <Link
+                to="/admin"
+                onClick={() => setMenuOpen(false)}
+                className="block px-2 py-1 text-red-600 font-semibold"
+              >
+                🛠️ Admin Panel
+              </Link>
             )}
 
             {currentUser ? (

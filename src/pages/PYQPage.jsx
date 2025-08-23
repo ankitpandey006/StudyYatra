@@ -332,7 +332,7 @@ const PYQPage = () => {
                     handleFilterChange, clearAllFilters, activeFilterCount
                   }}
                 />
-                <button onClick={() => setIsFilterOpen(false)} className="mt-6 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg">
+                <button onClick={() => setIsFilterOpen(false)} className="mt-6 w-full bg-indigo-700 text-white font-bold py-2.5 rounded-lg">
                   View {filteredPYQs.length} Results
                 </button>
               </motion.div>

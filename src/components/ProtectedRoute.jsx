@@ -1,30 +1,42 @@
-// components/ProtectedRoute.jsx
+// src/components/ProtectedRoute.jsx
 import React, { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Navigate } from "react-router-dom";
-import { checkAdminStatus } from "../utils/checkAdminStatus";
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
-  const [isAuthorized, setIsAuthorized] = useState(null); // null = loading, false = unauthorized, true = ok
+  const [isAuthorized, setIsAuthorized] = useState(null);
 
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        setIsAuthorized(false); // Not logged in
+        setIsAuthorized(false);
         return;
       }
 
-      if (adminOnly) {
-        try {
-          const isAdmin = await checkAdminStatus(); // Secure check via backend
-          setIsAuthorized(isAdmin);
-        } catch (err) {
-          console.error("Error checking admin status:", err);
-          setIsAuthorized(false);
+      try {
+        const token = await user.getIdToken();
+
+        if (adminOnly) {
+          // Backend secure check
+          const res = await fetch("/api/auth/check-admin", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (res.ok) {
+            setIsAuthorized(true);
+          } else {
+            setIsAuthorized(false);
+          }
+        } else {
+          setIsAuthorized(true); // Normal logged in user
         }
-      } else {
-        setIsAuthorized(true); // Any authenticated user
+      } catch (err) {
+        console.error("Error verifying user:", err);
+        setIsAuthorized(false);
       }
     });
 

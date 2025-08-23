@@ -1,6 +1,6 @@
 // backend/routes/quizRoutes.js
 import express from "express";
-import { db } from "../firebaseAdmin.js";   // ✅ use only this
+import { db } from "../firebaseAdmin.js";
 
 const router = express.Router();
 
@@ -38,6 +38,23 @@ router.get("/", async (req, res) => {
     res.json(quizzes);
   } catch (error) {
     console.error("🔥 Quiz Fetch Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 📝 Get single quiz by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const quizRef = db.collection("quizzes").doc(req.params.id);
+    const quizDoc = await quizRef.get();
+
+    if (!quizDoc.exists) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    res.json({ id: quizDoc.id, ...quizDoc.data() });
+  } catch (error) {
+    console.error("🔥 Quiz Fetch By ID Error:", error);
     res.status(500).json({ error: error.message });
   }
 });

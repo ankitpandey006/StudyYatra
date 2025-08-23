@@ -10,6 +10,8 @@ import { auth, googleProvider } from "../lib/firebase";
 import { toast } from "react-toastify";
 import { FcGoogle } from "react-icons/fc";
 
+const ADMIN_EMAIL = "admin@example.com"; // change to your admin email
+
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +22,11 @@ const LoginPage = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        navigate("/");
+        if (user.email === ADMIN_EMAIL) {
+          navigate("/admin");
+        } else {
+          navigate("/");
+        }
       }
     });
     return () => unsubscribe();
@@ -42,8 +48,13 @@ const LoginPage = () => {
         })
       );
 
-      toast.success("✅ Login successful!");
-      navigate("/");
+      if (user.email === ADMIN_EMAIL) {
+        toast.success("✅ Admin login successful!");
+        navigate("/admin");
+      } else {
+        toast.success("✅ Login successful!");
+        navigate("/");
+      }
     } catch (error) {
       handleFirebaseError(error);
     } finally {
@@ -66,8 +77,13 @@ const LoginPage = () => {
         })
       );
 
-      toast.success("✅ Google login successful!");
-      navigate("/");
+      if (user.email === ADMIN_EMAIL) {
+        toast.success("✅ Admin login successful!");
+        navigate("/admin");
+      } else {
+        toast.success("✅ Google login successful!");
+        navigate("/");
+      }
     } catch (error) {
       handleFirebaseError(error);
     } finally {

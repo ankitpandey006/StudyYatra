@@ -16,7 +16,7 @@ const ResourceCard = ({ title, description, viewLink, downloadLink, subject }) =
           href={viewLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-500 text-white rounded hover:bg-indigo-600 transition"
+          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-700 text-white rounded hover:bg-indigo-600 transition"
         >
           <Eye size={16} /> View
         </a>

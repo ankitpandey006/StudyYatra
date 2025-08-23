@@ -12,14 +12,15 @@ const PORT = process.env.PORT || 5050;
 app.use(cors());
 app.use(express.json());
 
-// ✅ Routes
+// ✅ Routes Import
 import bookRoutes from './routes/bookRoutes.js';
 import noteRoutes from './routes/noteRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
 import resultRoutes from './routes/resultRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import paymentRoutes from './routes/payment.js';
-import checkAdminRoute from './routes/checkAdmin.js';
+import authRoutes from './routes/authRoutes.js';       // 🔹 Authentication + Check Admin APIs
+import uploadRoutes from './routes/uploadRoutes.js';   // 🔹 File Upload APIs
 
 // ✅ Use Routes
 app.use('/api/books', bookRoutes);
@@ -28,7 +29,8 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payment', paymentRoutes);
-app.use('/api/check-admin', checkAdminRoute);
+app.use('/api/auth', authRoutes);          // 🆕 Authentication + Check-Admin Routes
+app.use('/api/upload', uploadRoutes);      // 🆕 File Upload Routes
 
 // ✅ Root Endpoint
 app.get('/', (req, res) => {

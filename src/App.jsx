@@ -24,13 +24,10 @@ import MockTestStart from "./pages/MockTestStart";
 import AudioPage from "./pages/AudioPage";
 import ExamBoardPage from "./pages/ExamBoardPage";
 
-// Admin Pages (Protected)
-import AdminDashboard from "./admin/AdminDashboard";
-import UploadQuiz from "./admin/UploadQuiz";
-import UploadNotes from "./admin/UploadNotes";
-import UploadPYQ from "./admin/UploadPYQ";
-import UploadAudiobook from "./admin/UploadAudiobook";
-import UploadEbook from "./admin/UploadEbook";
+// Admin Pages
+import AdminDashboard from "./admin/Dashboard";
+import Upload from "./admin/Upload";
+import ManageUploads from "./admin/ManageUploads";
 
 // Auth Guard
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -57,13 +54,10 @@ function App() {
         <Route path="/audiobooks" element={<ProtectedRoute><AudioPage /></ProtectedRoute>} />
         <Route path="/exam/:board/:level" element={<ProtectedRoute><ExamBoardPage /></ProtectedRoute>} />
 
-        {/* 🔐 Admin Dashboard Routes (Admin only) */}
+        {/* 🔐 Admin Routes */}
         <Route path="/admin" element={<ProtectedRoute adminOnly={true}><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/admin/upload-quiz" element={<ProtectedRoute adminOnly={true}><UploadQuiz /></ProtectedRoute>} />
-        <Route path="/admin/upload-notes" element={<ProtectedRoute adminOnly={true}><UploadNotes /></ProtectedRoute>} />
-        <Route path="/admin/upload-pyq" element={<ProtectedRoute adminOnly={true}><UploadPYQ /></ProtectedRoute>} />
-        <Route path="/admin/upload-audiobook" element={<ProtectedRoute adminOnly={true}><UploadAudiobook /></ProtectedRoute>} />
-        <Route path="/admin/upload-ebook" element={<ProtectedRoute adminOnly={true}><UploadEbook /></ProtectedRoute>} />
+        <Route path="/admin/upload/:type" element={<ProtectedRoute adminOnly={true}><Upload /></ProtectedRoute>} />
+        <Route path="/admin/manage" element={<ProtectedRoute adminOnly={true}><ManageUploads /></ProtectedRoute>} />
       </Routes>
 
       <Footer />
@@ -73,4 +67,3 @@ function App() {
 }
 
 export default App;
- 
