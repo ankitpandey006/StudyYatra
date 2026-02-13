@@ -1,127 +1,164 @@
-import React, { useState } from 'react';
-import ResourceCard from '../components/ResourceCard';
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { BookOpen, Filter, Eye, Download, X } from "lucide-react";
 
-const BooksPage = () => {
-  const [selectedSubject, setSelectedSubject] = useState('All');
+/* =========================
+   Cloudinary Helper
+========================= */
+const normalizeCloudinaryUrl = (url = "") => {
+  if (!url) return url;
+  if (!url.includes("res.cloudinary.com")) return url;
 
-  const class10Books = [
-    {
-      title: 'Class 10 Hindi',
-      description: 'NCERT Hindi Book - क्षितिज, काव्यांश, स्पर्श',
-      subject: 'Hindi',
-      viewLink: '/ebooks/class10/hindi.pdf',
-      downloadLink: '/ebooks/class10/hindi.pdf',
-    },
-    {
-      title: 'Class 10 English',
-      description: 'NCERT English Book - First Flight, Footprints',
-      subject: 'English',
-      viewLink: '/ebooks/class10/english.pdf',
-      downloadLink: '/ebooks/class10/english.pdf',
-    },
-    {
-      title: 'Class 10 Sanskrit',
-      description: 'NCERT Sanskrit Book - शेमुषी',
-      subject: 'Sanskrit',
-      viewLink: '/ebooks/class10/sanskrit.pdf',
-      downloadLink: '/ebooks/class10/sanskrit.pdf',
-    },
-    {
-      title: 'Class 10 Mathematics',
-      description: 'NCERT Maths Book - Full Chapters',
-      subject: 'Maths',
-      viewLink: '/ebooks/class10/maths.pdf',
-      downloadLink: '/ebooks/class10/maths.pdf',
-    },
-    {
-      title: 'Class 10 Science',
-      description: 'NCERT Science Book - Physics, Chem, Bio',
-      subject: 'Science',
-      viewLink: '/ebooks/class10/science.pdf',
-      downloadLink: '/ebooks/class10/science.pdf',
-    },
-    {
-      title: 'Class 10 Social Science',
-      description: 'History, Civics, Geography, Economics',
-      subject: 'Social Science',
-      viewLink: '/ebooks/class10/social.pdf',
-      downloadLink: '/ebooks/class10/social.pdf',
-    },
-  ];
+  const match = url.match(/\/(image|raw|video)\/upload\//);
+  const resourceType = match?.[1] || "raw";
 
-  const class12Books = [
-    {
-      title: 'Class 12 Hindi',
-      description: 'NCERT Hindi Book - आरोह, वितान',
-      subject: 'Hindi',
-      viewLink: '/ebooks/class12/hindi.pdf',
-      downloadLink: '/ebooks/class12/hindi.pdf',
-    },
-    {
-      title: 'Class 12 English',
-      description: 'NCERT English Book - Flamingo, Vistas',
-      subject: 'English',
-      viewLink: '/ebooks/class12/english.pdf',
-      downloadLink: '/ebooks/class12/english.pdf',
-    },
-    {
-      title: 'Class 12 Mathematics',
-      description: 'NCERT Maths Book - Part 1 & 2',
-      subject: 'Maths',
-      viewLink: '/ebooks/class12/maths.pdf',
-      downloadLink: '/ebooks/class12/maths.pdf',
-    },
-    {
-      title: 'Class 12 Physics',
-      description: 'NCERT Physics Book - Part 1 & 2',
-      subject: 'Physics',
-      viewLink: '/ebooks/class12/physics.pdf',
-      downloadLink: '/ebooks/class12/physics.pdf',
-    },
-    {
-      title: 'Class 12 Chemistry',
-      description: 'NCERT Chemistry Book - Part 1 & 2',
-      subject: 'Chemistry',
-      viewLink: '/ebooks/class12/chemistry.pdf',
-      downloadLink: '/ebooks/class12/chemistry.pdf',
-    },
-    {
-      title: 'Class 12 Biology',
-      description: 'NCERT Biology Book - Complete',
-      subject: 'Biology',
-      viewLink: '/ebooks/class12/biology.pdf',
-      downloadLink: '/ebooks/class12/biology.pdf',
-    },
-  ];
+  return url
+    .replace("/image/upload/", `/${resourceType}/upload/`)
+    .replace("/raw/upload/", `/${resourceType}/upload/`)
+    .replace("/video/upload/", `/${resourceType}/upload/`);
+};
 
-  const subjects = [
-    'All',
-    'Hindi',
-    'English',
-    'Sanskrit',
-    'Maths',
-    'Science',
-    'Social Science',
-    'Physics',
-    'Chemistry',
-    'Biology',
-  ];
+const getViewUrl = (url) => normalizeCloudinaryUrl(url);
 
-  const filterBooks = (books) => {
-    if (selectedSubject === 'All') return books;
-    return books.filter((book) => book.subject === selectedSubject);
-  };
+const getDownloadUrl = (url) => {
+  let u = normalizeCloudinaryUrl(url);
+  if (u.includes("/upload/") && !u.includes("fl_attachment:true")) {
+    u = u.replace("/upload/", "/upload/fl_attachment:true/");
+  }
+  return u;
+};
+
+/* =========================
+   Preview Modal
+========================= */
+const PreviewModal = ({ book, onClose }) => {
+  if (!book) return null;
+
+  const viewUrl = getViewUrl(book.fileUrl);
+  const downloadUrl = getDownloadUrl(book.fileUrl);
 
   return (
-    <div className="p-4 md:p-8">
-      <h1 className="text-3xl font-bold text-center mb-6">📚 Class 10th & 12th NCERT eBooks</h1>
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden"
+      >
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h3 className="font-bold text-lg">{book.title}</h3>
+            <p className="text-sm text-gray-500">
+              Class {book.classLevel} • {book.subject}
+            </p>
+          </div>
+          <button onClick={onClose}>
+            <X />
+          </button>
+        </div>
 
-      {/* Filter Dropdown */}
+        <div className="flex-1 p-2 bg-gray-50">
+          <iframe
+            src={viewUrl}
+            title="ebook preview"
+            className="w-full h-full border-0 rounded-lg bg-white"
+          />
+        </div>
+
+        <div className="p-4 border-t flex justify-end gap-3">
+          <a
+            href={downloadUrl}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg flex items-center gap-2"
+          >
+            <Download size={16} /> Download
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* =========================
+   Main Component
+========================= */
+const BooksPage = () => {
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
+
+  const [ebooks, setEbooks] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState("All");
+  const [previewBook, setPreviewBook] = useState(null);
+
+  useEffect(() => {
+    const fetchEbooks = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/upload/public`, {
+          params: { type: "ebook" },
+        });
+
+        setEbooks(res.data?.uploads || []);
+      } catch (err) {
+        console.error("Ebook fetch error:", err);
+      }
+    };
+
+    fetchEbooks();
+  }, []);
+
+  const subjects = useMemo(() => {
+    const set = new Set(ebooks.map((b) => b.subject));
+    return ["All", ...Array.from(set)];
+  }, [ebooks]);
+
+  const filteredBooks = useMemo(() => {
+    if (selectedSubject === "All") return ebooks;
+    return ebooks.filter((b) => b.subject === selectedSubject);
+  }, [ebooks, selectedSubject]);
+
+  const class10Books = filteredBooks.filter((b) => b.classLevel === "10");
+  const class12Books = filteredBooks.filter((b) => b.classLevel === "12");
+
+  const renderCard = (book) => (
+    <div
+      key={book.id}
+      className="bg-white rounded-xl shadow p-4 hover:shadow-lg transition w-full sm:w-[80%] md:w-[45%] lg:w-[30%]"
+    >
+      <h3 className="font-bold text-lg text-indigo-700">{book.title}</h3>
+      <p className="text-sm text-gray-600 mt-1">{book.description}</p>
+
+      <div className="mt-4 flex gap-3">
+        <button
+          onClick={() => setPreviewBook(book)}
+          className="px-4 py-2 bg-indigo-700 text-white rounded flex items-center gap-2"
+        >
+          <Eye size={16} /> Preview
+        </button>
+        <a
+          href={getDownloadUrl(book.fileUrl)}
+          className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2"
+        >
+          <Download size={16} /> Download
+        </a>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="p-6">
+      {previewBook && (
+        <PreviewModal book={previewBook} onClose={() => setPreviewBook(null)} />
+      )}
+
+      <h1 className="text-3xl font-bold text-center mb-6">
+        📚 Class 10 & 12 NCERT eBooks
+      </h1>
+
+      {/* Filter */}
       <div className="flex justify-center mb-8">
         <select
           value={selectedSubject}
           onChange={(e) => setSelectedSubject(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-700"
+          className="px-4 py-2 border rounded-md"
         >
           {subjects.map((subj, i) => (
             <option key={i} value={subj}>
@@ -131,35 +168,27 @@ const BooksPage = () => {
         </select>
       </div>
 
-      {/* Class 10 Books */}
+      {/* Class 10 */}
       <section className="mb-12">
-        <h2 className="text-2xl font-semibold text-indigo-700 mb-4">📗 Class 10 eBooks</h2>
+        <h2 className="text-2xl font-semibold text-indigo-700 mb-4">
+          📗 Class 10 eBooks
+        </h2>
         <div className="flex flex-wrap gap-6 justify-center">
-          {filterBooks(class10Books).length ? (
-            filterBooks(class10Books).map((book, i) => (
-              <div key={i} className="w-full sm:w-[80%] md:w-[45%] lg:w-[30%]">
-                <ResourceCard {...book} />
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-500">No books found.</p>
-          )}
+          {class10Books.length
+            ? class10Books.map(renderCard)
+            : <p className="text-gray-500">No books found.</p>}
         </div>
       </section>
 
-      {/* Class 12 Books */}
+      {/* Class 12 */}
       <section>
-        <h2 className="text-2xl font-semibold text-indigo-700 mb-4">📙 Class 12 eBooks</h2>
+        <h2 className="text-2xl font-semibold text-indigo-700 mb-4">
+          📙 Class 12 eBooks
+        </h2>
         <div className="flex flex-wrap gap-6 justify-center">
-          {filterBooks(class12Books).length ? (
-            filterBooks(class12Books).map((book, i) => (
-              <div key={i} className="w-full sm:w-[80%] md:w-[45%] lg:w-[30%]">
-                <ResourceCard {...book} />
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-500">No books found.</p>
-          )}
+          {class12Books.length
+            ? class12Books.map(renderCard)
+            : <p className="text-gray-500">No books found.</p>}
         </div>
       </section>
     </div>

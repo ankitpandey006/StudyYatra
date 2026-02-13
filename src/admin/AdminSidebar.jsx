@@ -16,7 +16,6 @@ const AdminSidebar = () => {
 
   return (
     <>
-      {/* Mobile Header */}
       <div className="md:hidden flex justify-between items-center bg-gray-900 text-gray-100 p-4 shadow-lg">
         <h2 className="text-xl font-bold text-indigo-400">Admin Panel</h2>
         <button onClick={() => setIsOpen(!isOpen)}>
@@ -24,19 +23,16 @@ const AdminSidebar = () => {
         </button>
       </div>
 
-      {/* Sidebar */}
       <div
         className={`fixed top-0 left-0 z-50 h-screen w-64 bg-gray-900 text-gray-100 p-6 flex flex-col shadow-lg
         transform md:translate-x-0 transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0`}
       >
-        {/* Logo */}
         <div className="mb-10">
           <h2 className="text-2xl font-bold text-indigo-400">Admin Panel</h2>
           <p className="text-sm text-gray-400">Manage your platform</p>
         </div>
 
-        {/* Menu */}
         <nav className="flex flex-col gap-2 flex-1">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -45,11 +41,7 @@ const AdminSidebar = () => {
                 key={item.name}
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all
-                  ${
-                    isActive
-                      ? "bg-indigo-600 text-white shadow-md"
-                      : "hover:bg-gray-800 hover:text-indigo-400"
-                  }`}
+                  ${isActive ? "bg-indigo-600 text-white shadow-md" : "hover:bg-gray-800 hover:text-indigo-400"}`}
                 onClick={() => setIsOpen(false)}
               >
                 {item.icon}
@@ -59,18 +51,16 @@ const AdminSidebar = () => {
           })}
         </nav>
 
-        {/* Footer */}
         <div className="mt-auto pt-6 border-t border-gray-700 hidden md:block">
           <p className="text-xs text-gray-500">© {new Date().getFullYear()} Admin Dashboard</p>
         </div>
       </div>
 
-      {/* Mobile overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={() => setIsOpen(false)}
-        ></div>
+        />
       )}
     </>
   );

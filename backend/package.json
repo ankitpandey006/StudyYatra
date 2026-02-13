@@ -20,8 +20,9 @@
   "author": "Ankit Pandey",
   "license": "ISC",
   "dependencies": {
+    "cloudinary": "^2.9.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "firebase-admin": "^13.4.0",
     "multer": "^2.0.2",

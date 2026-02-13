@@ -1,15 +1,22 @@
-// routes/uploadRoutes.js
 import express from "express";
-import multer from "multer";
-import { uploadPDF } from "../controllers/uploadController.js";
+import upload from "../middlewares/upload.js";
+import { verifyToken, requireAdmin } from "../middlewares/authMiddleware.js";
+import {
+  uploadFile,
+  listUploads,
+  deleteUpload,
+  listPublicUploads, // ✅ NEW
+} from "../controllers/uploadController.js";
 
 const router = express.Router();
 
-// ⚡ Use memory storage (we send buffer to Firebase)
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+// ✅ PUBLIC (Users): section-wise list
+// /api/upload/public?type=notes&classLevel=10&subject=Science&language=hi
+router.get("/public", listPublicUploads);
 
-// 📂 POST /api/upload
-router.post("/", upload.single("file"), uploadPDF);
+// ✅ ADMIN ONLY
+router.post("/", verifyToken, requireAdmin, upload.single("file"), uploadFile);
+router.get("/", verifyToken, requireAdmin, listUploads);
+router.delete("/:id", verifyToken, requireAdmin, deleteUpload);
 
 export default router;
