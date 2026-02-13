@@ -1,6 +1,16 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Upload, BookOpen, FileText, Settings, Menu, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  Upload,
+  BookOpen,
+  FileText,
+  Settings,
+  Menu,
+  X,
+  Headphones,
+  ClipboardList,
+} from "lucide-react";
 
 const AdminSidebar = () => {
   const location = useLocation();
@@ -11,6 +21,11 @@ const AdminSidebar = () => {
     { name: "Upload PYQ", path: "/admin/upload/pyq", icon: <Upload className="w-5 h-5" /> },
     { name: "Upload Notes", path: "/admin/upload/notes", icon: <BookOpen className="w-5 h-5" /> },
     { name: "Upload Ebook", path: "/admin/upload/ebook", icon: <FileText className="w-5 h-5" /> },
+
+    // ✅ NEW
+    { name: "Upload Quiz", path: "/admin/upload/quiz", icon: <ClipboardList className="w-5 h-5" /> },
+    { name: "Upload Audiobook", path: "/admin/upload/audiobook", icon: <Headphones className="w-5 h-5" /> },
+
     { name: "Manage Uploads", path: "/admin/manage", icon: <Settings className="w-5 h-5" /> },
   ];
 

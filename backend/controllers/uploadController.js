@@ -12,6 +12,62 @@ const toDate = (v) => {
 const clean = (s = "") =>
   String(s).trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");
 
+/* ===============================
+   ✅ QUIZ HELPERS
+================================ */
+const parseJsonBuffer = (buffer) => {
+  const raw = buffer?.toString("utf8") || "";
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error("Invalid JSON file. Please upload a valid .json quiz file.");
+  }
+};
+
+const normalizeQuestions = (payload) => {
+  // Accept: [ ... ] OR { questions: [ ... ] }
+  const questions = Array.isArray(payload) ? payload : payload?.questions;
+
+  if (!Array.isArray(questions)) {
+    throw new Error('Quiz JSON must be an array OR { "questions": [...] }');
+  }
+  if (questions.length === 0) {
+    throw new Error("Quiz must contain at least 1 question.");
+  }
+
+  return questions.map((q, idx) => {
+    const questionText = q?.question ?? q?.q ?? q?.title;
+    const options = q?.options ?? q?.choices;
+    const answer = q?.answer ?? q?.correctAnswer ?? q?.correctOption;
+
+    if (!questionText || typeof questionText !== "string") {
+      throw new Error(`Question #${idx + 1}: missing question text`);
+    }
+    if (!Array.isArray(options) || options.length < 2) {
+      throw new Error(`Question #${idx + 1}: options must be an array (min 2)`);
+    }
+
+    // allow answer as string(option) OR number(index)
+    let correctIndex = -1;
+    if (typeof answer === "string") {
+      correctIndex = options.indexOf(answer);
+    } else if (Number.isInteger(answer)) {
+      correctIndex = answer;
+    }
+
+    if (correctIndex < 0 || correctIndex >= options.length) {
+      throw new Error(`Question #${idx + 1}: invalid answer`);
+    }
+
+    return {
+      question: String(questionText).trim(),
+      options,
+      correctIndex,
+      explanation: q?.explanation ? String(q.explanation) : "",
+    };
+  });
+};
+
 /* =====================================================
    ✅ UPLOAD FILE (ADMIN)
 ===================================================== */
@@ -23,26 +79,11 @@ export const uploadFile = async (req, res) => {
 
     const title = (req.body.title || "").toString().trim();
     const description = (req.body.description || "").toString().trim();
-
-    // ✅ CHANGE 1: type always lowercase (PYQ page filters: type=pyq)
-    // (tumhare code me already hai - good)
     const type = (req.body.type || "").toString().trim().toLowerCase();
-
-    // ✅ CHANGE 2 (recommended): classLevel normalize to string like "10"/"12"
-    // NotesPage uses selectedClass "10"/"12", so keep exact
-    const classLevel = String(req.body.classLevel || "").trim();
-
-    // ✅ CHANGE 3 (recommended): subject & language normalize consistently
-    // IMPORTANT: PYQPage filtering depends on exact subject text.
-    // If upload dropdown uses "Math" but admin sends "Maths", mismatch -> not show in filters/search.
-    const subject = String(req.body.subject || "").trim();
-
-    // language must be "hi" or "en" ideally
-    const language = String(req.body.language || "").trim().toLowerCase();
-
-    // year for pyq should be string (you later convert to Number in frontend)
-    const year = String(req.body.year || "").trim();
-
+    const classLevel = (req.body.classLevel || "").toString().trim();
+    const subject = (req.body.subject || "").toString().trim();
+    const language = (req.body.language || "").toString().trim();
+    const year = (req.body.year || "").toString().trim();
     const chapterOrTopic = (req.body.chapterOrTopic || "").toString().trim();
 
     if (!ALLOWED_TYPES.includes(type)) {
@@ -64,11 +105,94 @@ export const uploadFile = async (req, res) => {
       return res.status(400).json({ success: false, message: "Year is required for PYQ!" });
     }
 
+    /* ===============================
+       ✅ QUIZ: Parse JSON -> Save to Firestore quizzes
+       (Skip Cloudinary upload)
+    ================================ */
+    if (type === "quiz") {
+      const nameOk = req.file.originalname?.toLowerCase().endsWith(".json");
+      const mimeOk =
+        req.file.mimetype === "application/json" ||
+        req.file.mimetype === "" ||
+        req.file.mimetype === "text/plain"; // some systems
+
+      if (!nameOk) {
+        return res.status(400).json({ success: false, message: "Quiz file must be a .json file" });
+      }
+      if (!mimeOk) {
+        // not strict, but helps
+        return res.status(400).json({ success: false, message: "Invalid quiz file type" });
+      }
+
+      // 1) parse json from memory buffer (your multer is memoryStorage because you use req.file.buffer)
+      const payload = parseJsonBuffer(req.file.buffer);
+
+      // 2) normalize + validate questions
+      const questions = normalizeQuestions(payload);
+
+      // 3) save quiz doc
+      const quizDoc = {
+        title,
+        description,
+        type: "quiz",
+        classLevel,
+        subject,
+        language,
+        year: year || null, // optional for quiz
+        chapterOrTopic: chapterOrTopic || null, // optional
+
+        questions,
+        questionCount: questions.length,
+
+        isPublished: true,
+        createdAt: new Date(),
+        createdBy: req.user?.uid || null,
+      };
+
+      const ref = await db.collection("quizzes").add(quizDoc);
+
+      // (Optional) also keep a lightweight entry in uploads for manage page consistency
+      // Uncomment if you want quiz also visible in /admin/manage:
+      /*
+      const uploadsDoc = {
+        title,
+        description,
+        type: "quiz",
+        classLevel,
+        subject,
+        language,
+        year: year || null,
+        chapterOrTopic: chapterOrTopic || null,
+        fileUrl: null,
+        publicId: null,
+        resourceType: null,
+        mimeType: req.file.mimetype || "application/json",
+        size: req.file.size || null,
+        folder: null,
+        isPublished: true,
+        createdAt: new Date(),
+        createdBy: req.user?.uid || null,
+        quizId: ref.id,
+        questionCount: questions.length,
+      };
+      await db.collection("uploads").add(uploadsDoc);
+      */
+
+      return res.status(200).json({
+        success: true,
+        message: "Quiz saved to Firestore ✅",
+        quiz: { id: ref.id, ...quizDoc, createdAt: new Date().toISOString() },
+      });
+    }
+
+    /* ===============================
+       ✅ NON-QUIZ: Upload to Cloudinary -> Save to Firestore uploads
+    ================================ */
+
     // ✅ Cloudinary Folder
     const folder = `studyyatra/${clean(classLevel)}/${clean(subject)}/${clean(type)}`;
 
-    // ✅ IMPORTANT:
-    // Use "auto" so PDF opens inline in browser (not forced download)
+    // ✅ IMPORTANT: Use "auto" so PDF opens inline in browser
     const mimetype = req.file.mimetype || "";
     let resource_type = "auto";
 
@@ -99,11 +223,7 @@ export const uploadFile = async (req, res) => {
       classLevel,
       subject,
       language,
-
-      // ✅ CHANGE 4: year only for pyq (already ok)
       year: type === "pyq" ? year : null,
-
-      // ✅ CHANGE 5: chapter/topic only for notes (already ok)
       chapterOrTopic: type === "notes" ? chapterOrTopic || null : null,
 
       fileUrl: result.secure_url,
@@ -113,13 +233,8 @@ export const uploadFile = async (req, res) => {
       size: result.bytes || req.file.size,
       folder,
 
-      // ✅ CHANGE 6 (important for public pages):
-      // PYQPage / NotesPage fetch only isPublished == true
       isPublished: true,
-
-      // ✅ CHANGE 7 (recommended): Firestore server timestamp best (but this is ok too)
       createdAt: new Date(),
-
       createdBy: req.user?.uid || null,
     };
 
@@ -176,19 +291,11 @@ export const listPublicUploads = async (req, res) => {
 
     let q = db.collection("uploads").where("isPublished", "==", true);
 
-    // ✅ CHANGE 8: type normalize to lower (already done - good)
     if (type) q = q.where("type", "==", String(type).toLowerCase());
-
-    // ✅ CHANGE 9: classLevel/subject/language should match saved values EXACTLY.
-    // Agar admin uploads me "Class 10" save ho gaya, aur frontend "10" bhej raha,
-    // to mismatch => empty.
-    if (classLevel) q = q.where("classLevel", "==", String(classLevel).trim());
-
-    if (subject) q = q.where("subject", "==", String(subject).trim());
-
-    if (language) q = q.where("language", "==", String(language).trim().toLowerCase());
-
-    if (year) q = q.where("year", "==", String(year).trim());
+    if (classLevel) q = q.where("classLevel", "==", String(classLevel));
+    if (subject) q = q.where("subject", "==", String(subject));
+    if (language) q = q.where("language", "==", String(language));
+    if (year) q = q.where("year", "==", String(year));
 
     q = q.orderBy("createdAt", "desc");
 

@@ -48,6 +48,7 @@ const Upload = () => {
 
   const needsYear = type === "pyq";
   const showChapter = type === "notes";
+  const isQuiz = type === "quiz";
 
   const currentYear = new Date().getFullYear();
   const YEAR_OPTIONS = useMemo(() => {
@@ -60,6 +61,7 @@ const Upload = () => {
   useEffect(() => {
     setYear("");
     setChapterOrTopic("");
+    setFile(null);
   }, [type]);
 
   if (!allowedTypes.includes(type)) {
@@ -74,6 +76,61 @@ const Upload = () => {
     return await user.getIdToken();
   };
 
+  // ✅ read JSON file (for quiz)
+  const readJsonFile = (fileObj) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          resolve(JSON.parse(String(reader.result)));
+        } catch {
+          reject(new Error("Invalid JSON file"));
+        }
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(fileObj);
+    });
+
+  // ✅ basic quiz validation (supports [ ... ] OR { questions: [...] })
+  const validateQuizPayload = (payload) => {
+    const questions = Array.isArray(payload) ? payload : payload?.questions;
+
+    if (!Array.isArray(questions)) {
+      return { ok: false, message: 'Quiz JSON must be an array OR { "questions": [...] }' };
+    }
+    if (questions.length === 0) {
+      return { ok: false, message: "Quiz must contain at least 1 question." };
+    }
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+
+      const questionText = q?.question ?? q?.q ?? q?.title;
+      const options = q?.options ?? q?.choices;
+      const answer = q?.answer ?? q?.correctAnswer ?? q?.correctOption ?? q?.correctIndex;
+
+      if (!questionText || typeof questionText !== "string") {
+        return { ok: false, message: `Question #${i + 1}: missing question text` };
+      }
+
+      if (!Array.isArray(options) || options.length < 2) {
+        return { ok: false, message: `Question #${i + 1}: options must be an array (min 2)` };
+      }
+
+      // answer can be string (value) OR number (index)
+      const answerOk =
+        typeof answer === "string"
+          ? options.includes(answer)
+          : Number.isInteger(answer) && answer >= 0 && answer < options.length;
+
+      if (!answerOk) {
+        return { ok: false, message: `Question #${i + 1}: invalid answer` };
+      }
+    }
+
+    return { ok: true };
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
 
@@ -86,36 +143,89 @@ const Upload = () => {
     if (!file) return toast.error("Please select a file!");
     if (file.size > 20 * 1024 * 1024) return toast.error("File size must be under 20MB");
 
+    // ✅ Quiz-only checks
+    if (isQuiz) {
+      const nameOk = file.name?.toLowerCase().endsWith(".json");
+      const typeOk = file.type === "application/json" || file.type === "";
+      if (!nameOk || !typeOk) return toast.error("Quiz file must be a .json file");
+    }
+
     try {
       setLoading(true);
 
       const token = await getToken();
 
+      /* =========================================
+         ✅ QUIZ: JSON -> /api/quizzes/import
+      ========================================== */
+      if (isQuiz) {
+        const payloadFromFile = await readJsonFile(file);
+
+        // validate file payload
+        const verdict = validateQuizPayload(payloadFromFile);
+        if (!verdict.ok) {
+          toast.error(verdict.message);
+          return;
+        }
+
+        // ✅ quizRoutes.js expects `class` not `classLevel`
+        const importPayload = {
+          ...payloadFromFile,
+          title: title.trim(),
+          class: classLevel,
+          subject,
+          language,
+          isPublished: true,
+          importSource: "admin-panel",
+        };
+
+        if (description.trim()) importPayload.description = description.trim();
+
+        await axios.post(`${API_URL}/api/quizzes/import`, importPayload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        toast.success("Quiz imported successfully ✅");
+
+        // reset
+        setTitle("");
+        setDescription("");
+        setFile(null);
+        setClassLevel("");
+        setSubject("");
+        setLanguage("");
+        setYear("");
+        setChapterOrTopic("");
+
+        navigate("/admin/manage");
+        return;
+      }
+
+      /* =========================================
+         ✅ NON-QUIZ: FormData -> /api/upload
+      ========================================== */
       const formData = new FormData();
 
-      // ✅ main fields
       formData.append("title", title.trim());
-      formData.append("description", description.trim()); // optional
+      formData.append("description", description.trim());
       formData.append("type", type);
 
-      // ✅ metadata fields (section-wise)
-      formData.append("classLevel", classLevel); // "10" / "12"
+      formData.append("classLevel", classLevel);
       formData.append("subject", subject);
-      formData.append("language", language); // "hi" / "en"
+      formData.append("language", language);
 
       if (needsYear) formData.append("year", year);
       if (showChapter && chapterOrTopic.trim()) formData.append("chapterOrTopic", chapterOrTopic.trim());
 
-      // ✅ file
       formData.append("file", file);
 
-      const res = await axios.post(`${API_URL}/api/upload`, formData, {
+      await axios.post(`${API_URL}/api/upload`, formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       toast.success(`${type.toUpperCase()} uploaded successfully ✅`);
 
-      // ✅ reset
+      // reset
       setTitle("");
       setDescription("");
       setFile(null);
@@ -128,7 +238,7 @@ const Upload = () => {
       navigate("/admin/manage");
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || err.response?.data?.error || "Upload failed!");
+      toast.error(err.response?.data?.message || err.response?.data?.error || err.message || "Upload failed!");
     } finally {
       setLoading(false);
     }
@@ -163,7 +273,7 @@ const Upload = () => {
               <label className="block text-sm font-semibold text-indigo-700 mb-1">Title</label>
               <input
                 type="text"
-                placeholder="e.g., Class 10 Science Notes - Ch 1 (Hindi)"
+                placeholder="e.g., Class 10 Science Quiz - Chapter 1 (Hindi)"
                 className="border border-indigo-200 p-2 sm:p-3 w-full rounded-xl focus:ring-2 focus:ring-indigo-400 outline-none transition bg-indigo-50/50"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -283,10 +393,12 @@ const Upload = () => {
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-indigo-300 p-6 sm:p-8 rounded-xl cursor-pointer hover:border-indigo-400 transition bg-indigo-50/40">
                 <UploadCloud className="w-10 h-10 sm:w-12 sm:h-12 text-indigo-500 mb-2 animate-bounce" />
                 <span className="text-indigo-700 text-sm sm:text-base font-medium">
-                  {file ? file.name : "Click to choose a file"}
+                  {file ? file.name : isQuiz ? "Click to choose a .json quiz file" : "Click to choose a file"}
                 </span>
+
                 <input
                   type="file"
+                  accept={isQuiz ? "application/json,.json" : undefined}
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
                   className="hidden"
                   required
