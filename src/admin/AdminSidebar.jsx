@@ -22,7 +22,7 @@ const AdminSidebar = () => {
     { name: "Upload Notes", path: "/admin/upload/notes", icon: <BookOpen className="w-5 h-5" /> },
     { name: "Upload Ebook", path: "/admin/upload/ebook", icon: <FileText className="w-5 h-5" /> },
 
-    // ✅ NEW
+    
     { name: "Upload Quiz", path: "/admin/upload/quiz", icon: <ClipboardList className="w-5 h-5" /> },
     { name: "Upload Audiobook", path: "/admin/upload/audiobook", icon: <Headphones className="w-5 h-5" /> },
 

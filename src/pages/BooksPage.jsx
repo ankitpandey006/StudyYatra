@@ -1,6 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { BookOpen, Filter, Eye, Download, X } from "lucide-react";
+import { Eye, Download, X, Lock } from "lucide-react";
+import { getAuth } from "firebase/auth";
+import { usePremium } from "../hooks/usePremium";
+
+/* =========================
+   Razorpay Loader
+========================= */
+const loadRazorpay = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 
 /* =========================
    Cloudinary Helper
@@ -84,6 +99,7 @@ const PreviewModal = ({ book, onClose }) => {
 ========================= */
 const BooksPage = () => {
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
+  const { isPremium } = usePremium();
 
   const [ebooks, setEbooks] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState("All");
@@ -95,7 +111,6 @@ const BooksPage = () => {
         const res = await axios.get(`${API_URL}/api/upload/public`, {
           params: { type: "ebook" },
         });
-
         setEbooks(res.data?.uploads || []);
       } catch (err) {
         console.error("Ebook fetch error:", err);
@@ -103,10 +118,10 @@ const BooksPage = () => {
     };
 
     fetchEbooks();
-  }, []);
+  }, [API_URL]);
 
   const subjects = useMemo(() => {
-    const set = new Set(ebooks.map((b) => b.subject));
+    const set = new Set(ebooks.map((b) => b.subject).filter(Boolean));
     return ["All", ...Array.from(set)];
   }, [ebooks]);
 
@@ -115,33 +130,108 @@ const BooksPage = () => {
     return ebooks.filter((b) => b.subject === selectedSubject);
   }, [ebooks, selectedSubject]);
 
-  const class10Books = filteredBooks.filter((b) => b.classLevel === "10");
-  const class12Books = filteredBooks.filter((b) => b.classLevel === "12");
+  // ✅ Buy Premium -> always ₹49 (single plan) + Razorpay loader + login check
+  const handleBuyPremium = async () => {
+    try {
+      const user = getAuth().currentUser;
+      if (!user) return alert("Please login first");
 
-  const renderCard = (book) => (
-    <div
-      key={book.id}
-      className="bg-white rounded-xl shadow p-4 hover:shadow-lg transition w-full sm:w-[80%] md:w-[45%] lg:w-[30%]"
-    >
-      <h3 className="font-bold text-lg text-indigo-700">{book.title}</h3>
-      <p className="text-sm text-gray-600 mt-1">{book.description}</p>
+      const ok = await loadRazorpay();
+      if (!ok) return alert("Razorpay SDK load failed. Check internet.");
 
-      <div className="mt-4 flex gap-3">
-        <button
-          onClick={() => setPreviewBook(book)}
-          className="px-4 py-2 bg-indigo-700 text-white rounded flex items-center gap-2"
-        >
-          <Eye size={16} /> Preview
-        </button>
-        <a
-          href={getDownloadUrl(book.fileUrl)}
-          className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2"
-        >
-          <Download size={16} /> Download
-        </a>
+      const token = await user.getIdToken();
+
+      // ✅ NO plan (backend fixed ₹49)
+      const { data } = await axios.post(
+        `${API_URL}/api/payment/create-order`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const options = {
+        key: data.key,
+        amount: data.amount,
+        currency: data.currency,
+        name: "StudyYatra",
+        description: "Premium (1 Year)",
+        order_id: data.orderId,
+        handler: async function (rsp) {
+          await axios.post(
+            `${API_URL}/api/payment/verify`,
+            {
+              razorpay_order_id: rsp.razorpay_order_id,
+              razorpay_payment_id: rsp.razorpay_payment_id,
+              razorpay_signature: rsp.razorpay_signature,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          alert("🎉 Premium Activated! Now you can access everything.");
+          window.location.reload();
+        },
+        prefill: {
+          name: user.displayName || "StudyYatra User",
+          email: user.email,
+        },
+        theme: { color: "#6366F1" },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error("Buy Premium error:", err?.response?.data || err);
+      alert(err?.response?.data?.error || "❌ Payment failed. Please try again.");
+    }
+  };
+
+  const renderCard = (book) => {
+    const canAccess = book.isFree || isPremium;
+
+    return (
+      <div
+        key={book.id}
+        className="bg-white rounded-xl shadow p-4 hover:shadow-lg transition w-full sm:w-[80%] md:w-[45%] lg:w-[30%]"
+      >
+        <h3 className="font-bold text-lg text-indigo-700">{book.title}</h3>
+        <p className="text-sm text-gray-600 mt-1">{book.description}</p>
+
+        {!canAccess && (
+          <div className="mt-3 text-red-600 text-sm flex items-center gap-1">
+            <Lock size={14} /> Premium Required
+          </div>
+        )}
+
+        <div className="mt-4 flex gap-3">
+          {canAccess ? (
+            <>
+              <button
+                onClick={() => setPreviewBook(book)}
+                className="px-4 py-2 bg-indigo-700 text-white rounded flex items-center gap-2"
+              >
+                <Eye size={16} /> Preview
+              </button>
+              <a
+                href={getDownloadUrl(book.fileUrl)}
+                className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2"
+              >
+                <Download size={16} /> Download
+              </a>
+            </>
+          ) : (
+            <button
+              onClick={handleBuyPremium}
+              className="px-4 py-2 bg-red-600 text-white rounded flex items-center gap-2"
+            >
+              <Lock size={16} /> Buy Premium
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const class10Books = filteredBooks.filter((b) => String(b.classLevel) === "10");
+  const class12Books = filteredBooks.filter((b) => String(b.classLevel) === "12");
 
   return (
     <div className="p-6">
@@ -153,7 +243,6 @@ const BooksPage = () => {
         📚 Class 10 & 12 NCERT eBooks
       </h1>
 
-      {/* Filter */}
       <div className="flex justify-center mb-8">
         <select
           value={selectedSubject}
@@ -168,27 +257,29 @@ const BooksPage = () => {
         </select>
       </div>
 
-      {/* Class 10 */}
       <section className="mb-12">
         <h2 className="text-2xl font-semibold text-indigo-700 mb-4">
           📗 Class 10 eBooks
         </h2>
         <div className="flex flex-wrap gap-6 justify-center">
-          {class10Books.length
-            ? class10Books.map(renderCard)
-            : <p className="text-gray-500">No books found.</p>}
+          {class10Books.length ? (
+            class10Books.map(renderCard)
+          ) : (
+            <p className="text-gray-500">No books found.</p>
+          )}
         </div>
       </section>
 
-      {/* Class 12 */}
       <section>
         <h2 className="text-2xl font-semibold text-indigo-700 mb-4">
           📙 Class 12 eBooks
         </h2>
         <div className="flex flex-wrap gap-6 justify-center">
-          {class12Books.length
-            ? class12Books.map(renderCard)
-            : <p className="text-gray-500">No books found.</p>}
+          {class12Books.length ? (
+            class12Books.map(renderCard)
+          ) : (
+            <p className="text-gray-500">No books found.</p>
+          )}
         </div>
       </section>
     </div>
