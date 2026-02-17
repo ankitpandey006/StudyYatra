@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { usePremium } from "../hooks/usePremium"; // ✅ ADD THIS
 import {
   Crown,
   Lock,
@@ -22,6 +23,7 @@ const loadRazorpay = () =>
 
 const SubscriptionPage = () => {
   const { currentUser } = useAuth();
+  const { isPremium, loading: premiumLoading } = usePremium(); // ✅ USE HOOK
   const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:5050";
   const [loading, setLoading] = useState(false);
 
@@ -52,10 +54,17 @@ const SubscriptionPage = () => {
     );
   }
 
-  // Premium status check
-  const isActivePremium =
-    currentUser?.isPremium &&
-    (!currentUser?.expiresAt || new Date(currentUser.expiresAt) > new Date());
+  // ✅ IMPORTANT: premium check loading guard (reload flash fix)
+  if (premiumLoading) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-4">
+        <div className="text-sm text-gray-600">Checking subscription...</div>
+      </div>
+    );
+  }
+
+  // ✅ Premium status from hook
+  const isActivePremium = !!isPremium;
 
   // Premium view
   if (isActivePremium) {
@@ -77,26 +86,16 @@ const SubscriptionPage = () => {
               </div>
             </div>
 
+            {/* NOTE: subscriptionPlan/expiresAt tum /api/me me return karwa rahe ho,
+               to unko show karna ho to hook ko extend karke data return kara do */}
             <div className="sm:text-right">
               <p className="text-sm text-gray-600">Plan</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {currentUser.subscriptionPlan || "Premium"}
-              </p>
-              <p className="mt-2 text-sm text-gray-600">Expiry</p>
-              <p className="text-sm font-medium text-gray-900">
-                {currentUser.expiresAt
-                  ? new Date(currentUser.expiresAt).toLocaleDateString()
-                  : "—"}
-              </p>
+              <p className="text-lg font-semibold text-gray-900">Premium</p>
             </div>
           </div>
 
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[
-              "Unlimited Mock Tests",
-              "Notes & PYQs Access",
-              "Priority Updates",
-            ].map((t) => (
+            {["Unlimited Mock Tests", "Notes & PYQs Access", "Priority Updates"].map((t) => (
               <div
                 key={t}
                 className="rounded-xl border border-green-100 bg-green-50/60 px-4 py-3 flex items-center gap-2"
@@ -134,9 +133,9 @@ const SubscriptionPage = () => {
         return;
       }
 
-      const token = await currentUser.getIdToken();
+      // ✅ always get fresh token (esp. after reload)
+      const token = await currentUser.getIdToken(true);
 
-      // backend creates fixed amount order
       const { data: order } = await axios.post(
         `${API}/api/payment/create-order`,
         {},
@@ -150,8 +149,12 @@ const SubscriptionPage = () => {
         name: "StudyYatra",
         description: "Premium (1 Year) Subscription",
         order_id: order.orderId,
+
         handler: async function (rsp) {
           try {
+            // ✅ get fresh token again inside handler
+            const freshToken = await currentUser.getIdToken(true);
+
             await axios.post(
               `${API}/api/payment/verify`,
               {
@@ -159,16 +162,17 @@ const SubscriptionPage = () => {
                 razorpay_payment_id: rsp.razorpay_payment_id,
                 razorpay_signature: rsp.razorpay_signature,
               },
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${freshToken}` } }
             );
 
             alert("Payment successful. Premium activated.");
-            window.location.reload();
+            window.location.reload(); // now reload will show Activated ✅
           } catch (verifyErr) {
             console.error("Verification error:", verifyErr?.response?.data || verifyErr);
             alert("Payment completed but verification failed. Please contact support.");
           }
         },
+
         prefill: {
           name: currentUser.displayName || "StudyYatra User",
           email: currentUser.email,
@@ -190,7 +194,7 @@ const SubscriptionPage = () => {
     <div className="min-h-[80vh] px-4 py-10 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-100">
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          {/* Left: Offer / Benefits */}
+          {/* Left */}
           <div className="bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-white/60 p-6 sm:p-8">
             <div className="flex items-start gap-4">
               <div className="h-14 w-14 rounded-2xl bg-yellow-50 border border-yellow-100 flex items-center justify-center shadow-sm">
@@ -231,7 +235,7 @@ const SubscriptionPage = () => {
             </div>
           </div>
 
-          {/* Right: Pricing Card */}
+          {/* Right */}
           <div className="bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-white/60 p-6 sm:p-8 flex flex-col">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-600">Annual Plan</p>
