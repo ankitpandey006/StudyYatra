@@ -34,7 +34,10 @@ app.use(helmet());
 ============================== */
 const allowedOrigins = [
   "http://localhost:5173",
-  process.env.FRONTEND_URL, // https://your-vercel-app.vercel.app
+  "http://localhost:5174",
+  "http://localhost:3000",
+  "https://studynest.vercel.app",
+  process.env.FRONTEND_URL, // fallback for env-based prod
 ].filter(Boolean);
 
 app.use(
