@@ -3,14 +3,17 @@ import axios from "axios";
 import { CreditCard, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5050";
+const API_BASE = import.meta.env.VITE_API_URL; // ✅ no localhost fallback
 
-const RazorpayButton = ({
-  amount,
-  plan = "subscription",
-  user = {},
-  onSuccess,
-}) => {
+// ✅ helper: safely join base + path
+const api = (path = "") => {
+  if (!API_BASE) return path; // safeguard
+  const base = API_BASE.replace(/\/+$/, "");
+  const p = String(path).startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+};
+
+const RazorpayButton = ({ amount, plan = "subscription", user = {}, onSuccess }) => {
   const [loading, setLoading] = useState(false);
 
   // Load Razorpay SDK
@@ -26,33 +29,33 @@ const RazorpayButton = ({
   };
 
   const handlePayment = async () => {
+    if (!API_BASE) {
+      toast.error("VITE_API_URL missing. Add backend URL in .env / Vercel env.");
+      return;
+    }
+
     setLoading(true);
 
-    const isLoaded = await loadRazorpayScript();
-    if (!isLoaded) {
-      toast.error("Payment gateway failed to load. Please refresh.");
-      setLoading(false);
-      return;
-    }
-
-    const key = import.meta.env.VITE_RZP_KEY_ID;
-    if (!key) {
-      toast.error("Payment configuration missing.");
-      setLoading(false);
-      return;
-    }
-
     try {
-      const orderRes = await axios.post(
-        `${API_BASE}/api/payment/create-order`,
-        {
-          amount: Math.round(Number(amount) * 100),
-          notes: { plan, email: user?.email || "guest@example.com" },
-        }
-      );
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        toast.error("Payment gateway failed to load. Please refresh.");
+        return;
+      }
 
-      const { id: order_id, amount: orderAmount, currency } =
-        orderRes.data;
+      const key = import.meta.env.VITE_RZP_KEY_ID;
+      if (!key) {
+        toast.error("Payment configuration missing.");
+        return;
+      }
+
+      // ✅ Create order
+      const orderRes = await axios.post(api("/api/payment/create-order"), {
+        amount: Math.round(Number(amount) * 100),
+        notes: { plan, email: user?.email || "guest@example.com" },
+      });
+
+      const { id: order_id, amount: orderAmount, currency } = orderRes.data;
 
       const options = {
         key,
@@ -70,14 +73,11 @@ const RazorpayButton = ({
 
         handler: async (rsp) => {
           try {
-            const verifyRes = await axios.post(
-              `${API_BASE}/api/payment/verify`,
-              {
-                razorpay_order_id: rsp.razorpay_order_id,
-                razorpay_payment_id: rsp.razorpay_payment_id,
-                razorpay_signature: rsp.razorpay_signature,
-              }
-            );
+            const verifyRes = await axios.post(api("/api/payment/verify"), {
+              razorpay_order_id: rsp.razorpay_order_id,
+              razorpay_payment_id: rsp.razorpay_payment_id,
+              razorpay_signature: rsp.razorpay_signature,
+            });
 
             if (verifyRes.data?.ok) {
               toast.success("Payment successful!");
@@ -97,18 +97,16 @@ const RazorpayButton = ({
 
       rzp.on("payment.failed", function (resp) {
         console.error("Payment failed", resp?.error);
-        toast.error(
-          resp?.error?.description || "Payment failed. Please try again."
-        );
+        toast.error(resp?.error?.description || "Payment failed. Please try again.");
       });
 
       rzp.open();
     } catch (err) {
       console.error("Order creation error", err?.response?.data || err?.message);
-      toast.error("Could not initiate payment.");
+      toast.error(err?.response?.data?.message || "Could not initiate payment.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

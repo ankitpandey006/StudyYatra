@@ -150,7 +150,10 @@ const fmtTime = (sec = 0) => {
    Main Component
 ========================= */
 const AudioPage = () => {
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
+  // ✅ Production-safe base URL (trims trailing slash)
+  const API_URL =
+    import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:5050";
+
   const { isPremium } = usePremium();
 
   const [audioBooks, setAudioBooks] = useState([]);
@@ -195,21 +198,27 @@ const AudioPage = () => {
       }
     };
     fetchAudio();
-  }, [API_URL]);
+    // ✅ API_URL is constant at runtime, so empty deps avoids re-fetch loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* =========================
      Filters
   ========================== */
   const classOptions = useMemo(() => {
     const set = new Set();
-    (audioBooks || []).forEach((a) => a?.classLevel && set.add(String(a.classLevel)));
+    (audioBooks || []).forEach(
+      (a) => a?.classLevel && set.add(String(a.classLevel))
+    );
     return Array.from(set).sort((a, b) => Number(a) - Number(b));
   }, [audioBooks]);
 
   const subjectOptions = useMemo(() => {
     const set = new Set();
     (audioBooks || [])
-      .filter((a) => (selectedClass ? String(a.classLevel) === String(selectedClass) : true))
+      .filter((a) =>
+        selectedClass ? String(a.classLevel) === String(selectedClass) : true
+      )
       .forEach((a) => a?.subject && set.add(a.subject));
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [audioBooks, selectedClass]);
@@ -218,11 +227,15 @@ const AudioPage = () => {
     const q = searchTerm.trim().toLowerCase();
     return (audioBooks || [])
       .filter((a) => !!a?.fileUrl)
-      .filter((a) => (!selectedClass ? true : String(a.classLevel) === String(selectedClass)))
+      .filter((a) =>
+        !selectedClass ? true : String(a.classLevel) === String(selectedClass)
+      )
       .filter((a) => (!selectedSubject ? true : a.subject === selectedSubject))
       .filter((a) => {
         if (!q) return true;
-        const hay = `${a.title || ""} ${a.subject || ""} class ${a.classLevel || ""}`.toLowerCase();
+        const hay = `${a.title || ""} ${a.subject || ""} class ${
+          a.classLevel || ""
+        }`.toLowerCase();
         return hay.includes(q);
       });
   }, [audioBooks, selectedClass, selectedSubject, searchTerm]);
@@ -339,7 +352,6 @@ const AudioPage = () => {
       await audio.play();
       setIsPlaying(true);
     } catch {
-      // user gesture may be required on some browsers
       setIsPlaying(false);
     }
   };
@@ -590,7 +602,9 @@ const AudioPage = () => {
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 {selectedClass ? <Badge tone="blue">Class: {selectedClass}</Badge> : null}
-                {selectedSubject ? <Badge tone="purple">Subject: {selectedSubject}</Badge> : null}
+                {selectedSubject ? (
+                  <Badge tone="purple">Subject: {selectedSubject}</Badge>
+                ) : null}
                 {searchTerm ? <Badge tone="gray">Search: “{searchTerm}”</Badge> : null}
               </div>
 
@@ -656,7 +670,9 @@ const AudioPage = () => {
                     {currentTrack?.title || "Select an audiobook to play"}
                   </div>
                   <div className="text-sm text-gray-600 truncate">
-                    {currentTrack ? `Class ${currentTrack.classLevel} • ${currentTrack.subject}` : " "}
+                    {currentTrack
+                      ? `Class ${currentTrack.classLevel} • ${currentTrack.subject}`
+                      : " "}
                   </div>
                 </div>
               </div>
@@ -708,9 +724,7 @@ const AudioPage = () => {
                     disabled={!currentTrack}
                   />
 
-                  <div className="text-xs text-gray-500 w-10">
-                    {fmtTime(duration)}
-                  </div>
+                  <div className="text-xs text-gray-500 w-10">{fmtTime(duration)}</div>
                 </div>
               </div>
 

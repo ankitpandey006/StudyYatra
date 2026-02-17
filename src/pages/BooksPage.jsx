@@ -202,7 +202,10 @@ const PreviewModal = ({ book, onClose }) => {
    Main Component
 ========================= */
 const BooksPage = () => {
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
+  // ✅ Production-safe base URL (trims trailing slash)
+  const API_URL =
+    import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:5050";
+
   const { isPremium } = usePremium();
 
   const [ebooks, setEbooks] = useState([]);
@@ -237,7 +240,9 @@ const BooksPage = () => {
     };
 
     fetchEbooks();
-  }, [API_URL]);
+    // ✅ API_URL is constant at runtime; keep deps empty to avoid re-fetch loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const subjects = useMemo(() => {
     const set = new Set();
@@ -248,12 +253,16 @@ const BooksPage = () => {
   const filteredBooks = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (ebooks || [])
-      .filter((b) => (selectedClass ? String(b.classLevel) === String(selectedClass) : true))
+      .filter((b) =>
+        selectedClass ? String(b.classLevel) === String(selectedClass) : true
+      )
       .filter((b) => (selectedSubject ? b.subject === selectedSubject : true))
       .filter((b) => (b?.fileUrl ? true : false))
       .filter((b) => {
         if (!q) return true;
-        const hay = `${b.title || ""} ${b.subject || ""} ${b.description || ""}`.toLowerCase();
+        const hay = `${b.title || ""} ${b.subject || ""} ${
+          b.description || ""
+        }`.toLowerCase();
         return hay.includes(q);
       });
   }, [ebooks, selectedClass, selectedSubject, search]);
@@ -343,7 +352,7 @@ const BooksPage = () => {
 
     return (
       <div
-        key={book.id}
+        key={book.id || book.fileUrl}
         className="bg-white rounded-2xl shadow-sm ring-1 ring-gray-100 p-5 hover:shadow-md transition"
       >
         <div className="flex items-start gap-3">
@@ -499,7 +508,9 @@ const BooksPage = () => {
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
                 <Badge tone="blue">Class: {selectedClass}</Badge>
-                {selectedSubject ? <Badge tone="purple">Subject: {selectedSubject}</Badge> : null}
+                {selectedSubject ? (
+                  <Badge tone="purple">Subject: {selectedSubject}</Badge>
+                ) : null}
                 {search ? <Badge tone="gray">Search: “{search}”</Badge> : null}
               </div>
 
@@ -525,7 +536,8 @@ const BooksPage = () => {
             <>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm text-gray-600">
-                  Showing <span className="font-bold">{filteredBooks.length}</span> ebooks
+                  Showing{" "}
+                  <span className="font-bold">{filteredBooks.length}</span> ebooks
                 </p>
               </div>
 

@@ -10,6 +10,17 @@ const TABS = {
   QUIZZES: "quizzes",
 };
 
+// ✅ API Base URL (Vercel/Netlify env se)
+const API_URL = import.meta.env.VITE_API_URL;
+
+// ✅ helper to safely join URL paths
+const api = (path = "") => {
+  if (!API_URL) return path; // safeguard
+  const base = API_URL.replace(/\/+$/, "");
+  const p = String(path).startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+};
+
 const ManageUploads = () => {
   const [activeTab, setActiveTab] = useState(TABS.UPLOADS);
 
@@ -23,8 +34,6 @@ const ManageUploads = () => {
 
   // ui
   const [loading, setLoading] = useState(true);
-
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
 
   useEffect(() => {
     // first load
@@ -40,18 +49,25 @@ const ManageUploads = () => {
   };
 
   /* ============================
-      FETCH UPLOADS
+      FETCH UPLOADS (Admin Protected)
   ============================ */
   const fetchUploads = async () => {
     try {
+      if (!API_URL) {
+        toast.error("VITE_API_URL missing. Add it in .env / Vercel env variables.");
+        setUploads([]);
+        setFilteredUploads([]);
+        return;
+      }
+
       setLoading(true);
       const token = await getToken();
 
-      const res = await axios.get(`${API_URL}/api/upload`, {
+      const res = await axios.get(api("/api/upload"), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = Array.isArray(res.data.uploads) ? res.data.uploads : [];
+      const data = Array.isArray(res.data?.uploads) ? res.data.uploads : [];
       setUploads(data);
       setFilteredUploads(data);
     } catch (err) {
@@ -69,9 +85,16 @@ const ManageUploads = () => {
   ============================ */
   const fetchQuizzes = async () => {
     try {
+      if (!API_URL) {
+        toast.error("VITE_API_URL missing. Add it in .env / Vercel env variables.");
+        setQuizzes([]);
+        setFilteredQuizzes([]);
+        return;
+      }
+
       setLoading(true);
-      // quizzes list is public in your quizRoutes.js, no token required.
-      // BUT for safety/admin panel, we can still attach token if available (optional).
+
+      // quizzes list public hai but admin panel me token attach (optional)
       let headers = {};
       try {
         const token = await getToken();
@@ -80,9 +103,9 @@ const ManageUploads = () => {
         // ignore if not logged in
       }
 
-      const res = await axios.get(`${API_URL}/api/quizzes`, { headers });
+      const res = await axios.get(api("/api/quizzes"), { headers });
 
-      const data = Array.isArray(res.data.quizzes) ? res.data.quizzes : [];
+      const data = Array.isArray(res.data?.quizzes) ? res.data.quizzes : [];
       setQuizzes(data);
       setFilteredQuizzes(data);
     } catch (err) {
@@ -107,16 +130,21 @@ const ManageUploads = () => {
     if (!window.confirm("Are you sure you want to delete this file?")) return;
 
     try {
+      if (!API_URL) {
+        toast.error("VITE_API_URL missing. Add it in .env / Vercel env variables.");
+        return;
+      }
+
       const token = await getToken();
 
-      await axios.delete(`${API_URL}/api/upload/${id}`, {
+      await axios.delete(api(`/api/upload/${id}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       toast.success("File deleted successfully ✅");
       await fetchUploads();
     } catch (err) {
-      console.error(err);
+      console.error("Delete upload error:", err);
       toast.error(err.response?.data?.message || err.message || "Failed to delete file");
     }
   };
@@ -128,16 +156,21 @@ const ManageUploads = () => {
     if (!window.confirm("Are you sure you want to delete this quiz?")) return;
 
     try {
+      if (!API_URL) {
+        toast.error("VITE_API_URL missing. Add it in .env / Vercel env variables.");
+        return;
+      }
+
       const token = await getToken();
 
-      await axios.delete(`${API_URL}/api/quizzes/${id}`, {
+      await axios.delete(api(`/api/quizzes/${id}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       toast.success("Quiz deleted successfully ✅");
       await fetchQuizzes();
     } catch (err) {
-      console.error(err);
+      console.error("Delete quiz error:", err);
       toast.error(err.response?.data?.message || err.message || "Failed to delete quiz");
     }
   };
@@ -160,6 +193,11 @@ const ManageUploads = () => {
             <p className="text-sm text-gray-500">
               Uploads = Notes/PYQ/Ebook/Audio • Quizzes = Firestore quizzes
             </p>
+            {!API_URL && (
+              <p className="text-xs text-red-600 mt-1">
+                ⚠️ Missing VITE_API_URL. Set it to https://studyyatra-backend.onrender.com
+              </p>
+            )}
           </div>
 
           <button

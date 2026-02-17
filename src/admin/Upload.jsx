@@ -23,16 +23,26 @@ const SUBJECT_OPTIONS = [
   "Geography",
   "Civics",
 ];
+
 const LANGUAGE_OPTIONS = [
   { label: "Hindi", value: "hi" },
   { label: "English", value: "en" },
 ];
 
+// ✅ API Base URL (Vercel/Netlify env)
+const API_URL = import.meta.env.VITE_API_URL;
+
+// ✅ helper: safely join base + path
+const api = (path = "") => {
+  if (!API_URL) return path; // safeguard
+  const base = API_URL.replace(/\/+$/, "");
+  const p = String(path).startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+};
+
 const Upload = () => {
   const { type } = useParams();
   const navigate = useNavigate();
-
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState(""); // ✅ optional (recommended)
@@ -134,6 +144,12 @@ const Upload = () => {
   const handleUpload = async (e) => {
     e.preventDefault();
 
+    // ✅ env check (deploy safety)
+    if (!API_URL) {
+      toast.error("VITE_API_URL missing. Set it in .env and Vercel env variables.");
+      return;
+    }
+
     // ✅ Required checks
     if (!title.trim()) return toast.error("Title is required!");
     if (!classLevel) return toast.error("Please select class!");
@@ -181,7 +197,7 @@ const Upload = () => {
 
         if (description.trim()) importPayload.description = description.trim();
 
-        await axios.post(`${API_URL}/api/quizzes/import`, importPayload, {
+        await axios.post(api("/api/quizzes/import"), importPayload, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -219,7 +235,7 @@ const Upload = () => {
 
       formData.append("file", file);
 
-      await axios.post(`${API_URL}/api/upload`, formData, {
+      await axios.post(api("/api/upload"), formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -264,6 +280,11 @@ const Upload = () => {
               <p className="text-xs sm:text-sm text-indigo-400">
                 Fill metadata so users get content section-wise.
               </p>
+              {!API_URL && (
+                <p className="text-xs text-red-600 mt-1">
+                  ⚠️ Missing VITE_API_URL. Set it to https://studyyatra-backend.onrender.com
+                </p>
+              )}
             </div>
           </div>
 

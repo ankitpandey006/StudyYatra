@@ -3,7 +3,16 @@ import React, { useEffect, useState } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { Navigate, useLocation } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
+// ✅ API base from env (no localhost fallback in production)
+const API_URL = import.meta.env.VITE_API_URL;
+
+// ✅ helper: safely join base + path
+const api = (path = "") => {
+  if (!API_URL) return path; // safeguard
+  const base = API_URL.replace(/\/+$/, "");
+  const p = String(path).startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
+};
 
 // ✅ simple session cache for admin check
 const ADMIN_CACHE_KEY = "isAdminVerified";
@@ -49,9 +58,16 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
       }
 
       try {
-        // ✅ Fast path: normal user
+        // ✅ Normal user routes
         if (!adminOnly) {
           setIsAuthorized(true);
+          return;
+        }
+
+        // ✅ Admin routes require backend URL
+        if (!API_URL) {
+          console.error("VITE_API_URL missing. Cannot verify admin.");
+          setIsAuthorized(false);
           return;
         }
 
@@ -65,8 +81,8 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
         // ✅ Get token (forceRefresh = false)
         const token = await user.getIdToken(false);
 
-        // ✅ Backend secure check (with API_URL + abort)
-        const res = await fetch(`${API_URL}/api/auth/check-admin`, {
+        // ✅ Backend secure check
+        const res = await fetch(api("/api/auth/check-admin"), {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
@@ -79,7 +95,6 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
         if (ok) writeAdminCache(true);
       } catch (err) {
         if (!alive) return;
-        // Abort error ignore
         if (err?.name === "AbortError") return;
         console.error("Error verifying user:", err);
         setIsAuthorized(false);
@@ -102,7 +117,6 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   }
 
   if (!isAuthorized) {
-    // ✅ user ko jis page pe jana tha, login ke baad wapas bhejne ke liye
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
