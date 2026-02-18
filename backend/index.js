@@ -30,26 +30,47 @@ app.set("trust proxy", 1);
 app.use(helmet());
 
 /* ==============================
-   CORS
+   BODY PARSER (before routes)
+============================== */
+app.use(express.json({ limit: "2mb" }));
+
+/* ==============================
+   CORS (No crash + Production ready)
 ============================== */
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:3000",
   "https://study-yatra-006.vercel.app",
-  process.env.FRONTEND_URL, // fallback for env-based prod
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: function (origin, cb) {
-      if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("Not allowed by CORS: " + origin));
-    },
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+
+    // optional: allow any vercel preview domain
+    try {
+      const hostname = new URL(origin).hostname;
+      if (hostname.endsWith(".vercel.app")) return cb(null, true);
+    } catch {}
+
+    return cb(new Error("Not allowed by CORS: " + origin));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+
+// ✅ IMPORTANT: Express v5 me app.options("*") crash kar sakta hai,
+// isliye safe preflight handler:
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
 /* ==============================
    RATE LIMIT
@@ -64,12 +85,7 @@ app.use(
 );
 
 /* ==============================
-   BODY PARSER
-============================== */
-app.use(express.json({ limit: "2mb" }));
-
-/* ==============================
-   HEALTH CHECK (important)
+   HEALTH CHECK
 ============================== */
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
@@ -93,17 +109,29 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/me", meRoutes);
 
 /* ==============================
-   ERROR HANDLER
+   404 HANDLER
+============================== */
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: "Route not found" });
+});
+
+/* ==============================
+   ERROR HANDLER (CORS -> 403)
 ============================== */
 app.use((err, req, res, next) => {
   console.error("❌ Server Error:", err?.message || err);
 
-  res.status(500).json({
+  const msg = String(err?.message || "");
+  const isCors = msg.startsWith("Not allowed by CORS:");
+
+  res.status(isCors ? 403 : 500).json({
     success: false,
     message:
       process.env.NODE_ENV === "production"
-        ? "Internal Server Error"
-        : err?.message,
+        ? isCors
+          ? "CORS blocked"
+          : "Internal Server Error"
+        : msg,
   });
 });
 

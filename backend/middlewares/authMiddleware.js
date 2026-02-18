@@ -1,5 +1,5 @@
 // backend/middlewares/authMiddleware.js
-import { auth, db } from "../firebaseAdmin.js";
+import { auth, db } from "../config/firebase.js";
 
 /**
  * verifyToken
@@ -8,20 +8,22 @@ import { auth, db } from "../firebaseAdmin.js";
  */
 export const verifyToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || "";
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Token missing" });
+    if (!authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, message: "Token missing" });
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.slice(7); // after "Bearer "
     const decoded = await auth.verifyIdToken(token);
 
     req.user = decoded;
     next();
   } catch (error) {
-    console.error("❌ Token verification failed:", error.message);
-    return res.status(401).json({ message: "Invalid or expired token" });
+    console.error("❌ Token verification failed:", error?.message || error);
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired token" });
   }
 };
 
@@ -32,26 +34,30 @@ export const verifyToken = async (req, res, next) => {
  */
 export const requireAdmin = async (req, res, next) => {
   try {
-    if (!req.user?.uid) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const userRef = db.collection("users").doc(req.user.uid);
-    const snap = await userRef.get();
-
+    const snap = await db.collection("users").doc(uid).get();
     if (!snap.exists) {
-      return res.status(403).json({ message: "User not found in Firestore" });
+      return res
+        .status(403)
+        .json({ success: false, message: "User not found in Firestore" });
     }
 
     const userData = snap.data();
-
     if (userData?.role !== "admin") {
-      return res.status(403).json({ message: "Admin access denied" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin access denied" });
     }
 
     next();
   } catch (error) {
-    console.error("❌ Admin check failed:", error.message);
-    return res.status(500).json({ message: "Server error" });
+    console.error("❌ Admin check failed:", error?.message || error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error" });
   }
 };

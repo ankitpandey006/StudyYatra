@@ -1,6 +1,6 @@
 // backend/routes/quizRoutes.js
 import express from "express";
-import { db } from "../firebaseAdmin.js";
+import { db } from "../config/firebase.js";
 import { verifyToken, requireAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();

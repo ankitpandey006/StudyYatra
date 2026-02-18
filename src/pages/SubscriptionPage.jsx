@@ -24,7 +24,7 @@ const loadRazorpay = () =>
 const SubscriptionPage = () => {
   const { currentUser } = useAuth();
   const { isPremium, loading: premiumLoading } = usePremium(); // ✅ USE HOOK
-  const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:5050";
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5050";
   const [loading, setLoading] = useState(false);
 
   // Not logged in
