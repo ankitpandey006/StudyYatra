@@ -36,7 +36,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:3000",
-  "https://studynest.vercel.app",
+  "https://study-yatra-006.vercel.app",
   process.env.FRONTEND_URL, // fallback for env-based prod
 ].filter(Boolean);
 
